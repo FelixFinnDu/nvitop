@@ -57,6 +57,7 @@ dynamic = ["version", "optional-dependencies"]
 [project.scripts]
 nvitop = "nvitop.cli:main"
 nvisel = "nvitop.select:main"
+tecotop = "nvitop.cli:tecotop_main"
 
 [project.urls]
 Homepage = "https://github.com/XuehaiPan/nvitop"

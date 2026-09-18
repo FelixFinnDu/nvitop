@@ -1,5 +1,9 @@
 # nvitop
 
+打包命令：\
+`cd ~/workspace/environment/nvitop`\
+`python -m pip wheel --no-build-isolation --no-deps -w dist .`
+
 <!-- markdownlint-disable html -->
 
 ![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-brightgreen)
@@ -250,15 +254,15 @@ There is also a CLI tool called `nvisel` that ships with the `nvitop` PyPI packa
 
 #### SDAA devices
 
-On Tecorigin SDAA systems, `nvitop` can read the vendor's `teco-smi` output to show each card's SPE utilization, memory usage, temperature, power, health, and reported processes. Make sure `teco-smi` is on `PATH`, then run:
+On Tecorigin SDAA systems, `tecotop` reads the vendor's `teco-smi` output to show each card's SPE utilization, memory usage, temperature, power, health, and reported processes. Make sure `teco-smi` is on `PATH`, then run:
 
 ```bash
-nvitop --backend sdaa --once       # one snapshot
-nvitop --backend sdaa              # refresh every two seconds in a terminal
-nvitop --backend sdaa -o 0 1       # select cards
+tecotop --once       # one snapshot
+tecotop              # refresh every two seconds in a terminal
+tecotop -o 0 1       # select cards
 ```
 
-`--backend auto` (the default) selects SDAA when NVIDIA NVML is unavailable or reports zero devices and `teco-smi` is installed. Set `NVITOP_TECO_SMI` to the executable path if it is outside `PATH`. SDAA monitor mode redraws in place; press `q` or Ctrl-C to leave it, and use Up/Down to scroll. The NVIDIA-specific process filters and CUDA visibility option are unavailable for SDAA.
+`tecotop` selects the SDAA backend by default. The `nvitop` command keeps `--backend auto`, which selects SDAA when NVIDIA NVML is unavailable or reports zero devices and `teco-smi` is installed. Set `NVITOP_TECO_SMI` to the executable path if it is outside `PATH`. SDAA monitor mode redraws in place; press `q` or Ctrl-C to leave it, and use Up/Down to scroll. The NVIDIA-specific process filters and CUDA visibility option are unavailable for SDAA.
 
 ### Resource Monitor
 

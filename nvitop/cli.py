@@ -26,8 +26,8 @@ NVITOP_MONITOR_MODE = set(
 
 
 # pylint: disable=too-many-branches,too-many-statements
-def parse_arguments() -> argparse.Namespace:
-    """Parse command-line arguments for ``nvitop``."""
+def parse_arguments(prog: str = 'nvitop', backend_default: str = 'auto') -> argparse.Namespace:
+    """Parse command-line arguments for ``nvitop`` or ``tecotop``."""
     coloring_rules = '{} < th1 %% <= {} < th2 %% <= {}'.format(
         colored('light', 'green'),
         colored('moderate', 'yellow'),
@@ -43,8 +43,12 @@ def parse_arguments() -> argparse.Namespace:
     posfloat.__name__ = 'positive float'
 
     parser = argparse.ArgumentParser(
-        prog='nvitop',
-        description='An interactive NVIDIA-GPU process viewer.',
+        prog=prog,
+        description=(
+            'An interactive SDAA device process viewer.'
+            if prog == 'tecotop'
+            else 'An interactive NVIDIA-GPU process viewer.'
+        ),
         formatter_class=argparse.RawTextHelpFormatter,
         add_help=False,
     )
@@ -67,7 +71,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         '--backend',
         choices=('auto', 'nvidia', 'sdaa'),
-        default='auto',
+        default=backend_default,
         help=(
             'Device backend. Auto uses SDAA when NVML fails or finds no devices '
             'and teco-smi exists.'
@@ -342,9 +346,9 @@ def _run_sdaa(args: argparse.Namespace) -> int:
 
 
 # pylint: disable-next=too-many-branches,too-many-statements,too-many-locals
-def main() -> int:
+def main(backend_default: str = 'auto', prog: str = 'nvitop') -> int:
     """Main function for ``nvitop`` CLI."""
-    args = parse_arguments()
+    args = parse_arguments(prog=prog, backend_default=backend_default)
 
     if args.force_color:
         set_color(True)
@@ -520,6 +524,11 @@ def main() -> int:
             print(message, file=sys.stderr)
         return 1
     return 0
+
+
+def tecotop_main() -> int:
+    """Start the nvitop CLI with the SDAA backend selected by default."""
+    return main(backend_default='sdaa', prog='tecotop')
 
 
 if __name__ == '__main__':
