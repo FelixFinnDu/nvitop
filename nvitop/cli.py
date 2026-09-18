@@ -7,8 +7,10 @@ import argparse
 import curses
 import math
 import os
+import shutil
 import sys
 import textwrap
+import time
 
 from nvitop.api import HostProcess, libnvml
 from nvitop.tui import TUI, USERNAME, Device, colored, libcurses, set_color, setlocale_utf8
@@ -62,6 +64,15 @@ def parse_arguments() -> argparse.Namespace:
         action='version',
         version=f'%(prog)s {__version__}',
         help="Show %(prog)s's version number and exit.",
+    )
+    parser.add_argument(
+        '--backend',
+        choices=('auto', 'nvidia', 'sdaa'),
+        default='auto',
+        help=(
+            'Device backend. Auto uses SDAA when NVML fails or finds no devices '
+            'and teco-smi exists.'
+        ),
     )
 
     mode = parser.add_mutually_exclusive_group()
@@ -281,6 +292,49 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
+def _run_sdaa(args: argparse.Namespace) -> int:
+    """Show a teco-smi snapshot, optionally refreshing it in a terminal."""
+    from nvitop.sdaa import SdaaError, format_snapshot, query_teco_smi
+
+    unsupported = [
+        name
+        for name in ('compute', 'only_compute', 'graphics', 'only_graphics', 'user')
+        if getattr(args, name)
+    ]
+    if args.only_visible:
+        unsupported.append('only-visible')
+    if unsupported:
+        print(
+            f'SDAA backend does not support these filters: {", ".join(unsupported)}',
+            file=sys.stderr,
+        )
+        return 2
+
+    command = os.environ.get('NVITOP_TECO_SMI', 'teco-smi')
+    indices = set(args.only) if args.only is not None else None
+    pids = set(args.pid) if args.pid is not None else None
+    monitor = hasattr(args, 'monitor') and TTY
+    try:
+        while True:
+            snapshot = query_teco_smi(command)
+            if indices is not None:
+                invalid = indices.difference(device.index for device in snapshot.devices)
+                if invalid:
+                    raise SdaaError(f'Invalid SDAA device indices: {sorted(invalid)}')
+            if monitor:
+                print('\033[H\033[2J', end='')
+            print(format_snapshot(snapshot, indices, pids), flush=True)
+            if not monitor:
+                return 0
+            print('\nPress Ctrl-C to quit.', flush=True)
+            time.sleep(args.interval or 2.0)
+    except KeyboardInterrupt:
+        return 0
+    except SdaaError as ex:
+        print(f'SDAA ERROR: {ex}', file=sys.stderr)
+        return 1
+
+
 # pylint: disable-next=too-many-branches,too-many-statements,too-many-locals
 def main() -> int:
     """Main function for ``nvitop`` CLI."""
@@ -309,16 +363,30 @@ def main() -> int:
     if not setlocale_utf8():
         args.no_unicode = True
 
+    if args.backend == 'sdaa':
+        return _run_sdaa(args)
+
     try:
         device_count = Device.count()
     except libnvml.NVMLError_LibraryNotFound:
+        if args.backend == 'auto' and shutil.which(os.environ.get('NVITOP_TECO_SMI', 'teco-smi')):
+            return _run_sdaa(args)
+        print('NVML library not found. Use --backend sdaa if teco-smi is available.',
+              file=sys.stderr)
         return 1
     except libnvml.NVMLError as ex:
+        if args.backend == 'auto' and shutil.which(os.environ.get('NVITOP_TECO_SMI', 'teco-smi')):
+            return _run_sdaa(args)
         print(
             '{} {}'.format(colored('NVML ERROR:', color='red', attrs=('bold',)), ex),
             file=sys.stderr,
         )
         return 1
+
+    if device_count == 0 and args.backend == 'auto' and shutil.which(
+        os.environ.get('NVITOP_TECO_SMI', 'teco-smi'),
+    ):
+        return _run_sdaa(args)
 
     if args.gpu_util_thresh is not None:
         Device.GPU_UTILIZATION_THRESHOLDS = tuple(sorted(args.gpu_util_thresh))

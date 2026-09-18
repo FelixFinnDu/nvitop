@@ -248,6 +248,18 @@ When the `-1` switch is on, the result will be displayed **ONLY ONCE** (same as 
 
 There is also a CLI tool called `nvisel` that ships with the `nvitop` PyPI package. See [CUDA Visible Devices Selection Tool](#cuda-visible-devices-selection-tool) for more information.
 
+#### SDAA devices
+
+On Tecorigin SDAA systems, `nvitop` can read the vendor's `teco-smi` output to show each card's SPE utilization, memory usage, temperature, power, health, and reported processes. Make sure `teco-smi` is on `PATH`, then run:
+
+```bash
+nvitop --backend sdaa --once       # one snapshot
+nvitop --backend sdaa              # refresh every two seconds in a terminal
+nvitop --backend sdaa -o 0 1       # select cards
+```
+
+`--backend auto` (the default) selects SDAA when NVIDIA NVML is unavailable or reports zero devices and `teco-smi` is installed. Set `NVITOP_TECO_SMI` to the executable path if it is outside `PATH`. SDAA monitor mode is a text overview; press Ctrl-C to leave it. The NVIDIA-specific process filters and CUDA visibility option are unavailable for SDAA.
+
 ### Resource Monitor
 
 Run as a resource monitor:
