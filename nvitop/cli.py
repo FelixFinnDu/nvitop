@@ -10,7 +10,6 @@ import os
 import shutil
 import sys
 import textwrap
-import time
 
 from nvitop.api import HostProcess, libnvml
 from nvitop.tui import TUI, USERNAME, Device, colored, libcurses, set_color, setlocale_utf8
@@ -294,7 +293,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def _run_sdaa(args: argparse.Namespace) -> int:
     """Show a teco-smi snapshot, optionally refreshing it in a terminal."""
-    from nvitop.sdaa import SdaaError, format_snapshot, query_teco_smi
+    from nvitop.sdaa import SdaaError, format_snapshot, monitor_teco_smi, query_teco_smi
 
     unsupported = [
         name
@@ -315,21 +314,21 @@ def _run_sdaa(args: argparse.Namespace) -> int:
     pids = set(args.pid) if args.pid is not None else None
     monitor = hasattr(args, 'monitor') and TTY
     try:
-        while True:
+        if monitor:
+            monitor_teco_smi(command, args.interval or 2.0, indices, pids)
+        else:
             snapshot = query_teco_smi(command)
             if indices is not None:
                 invalid = indices.difference(device.index for device in snapshot.devices)
                 if invalid:
                     raise SdaaError(f'Invalid SDAA device indices: {sorted(invalid)}')
-            if monitor:
-                print('\033[H\033[2J', end='')
-            print(format_snapshot(snapshot, indices, pids), flush=True)
-            if not monitor:
-                return 0
-            print('\nPress Ctrl-C to quit.', flush=True)
-            time.sleep(args.interval or 2.0)
+            print(format_snapshot(snapshot, indices, pids))
+        return 0
     except KeyboardInterrupt:
         return 0
+    except curses.error as ex:
+        print(f'SDAA ERROR: Cannot initialize terminal display: {ex}', file=sys.stderr)
+        return 1
     except SdaaError as ex:
         print(f'SDAA ERROR: {ex}', file=sys.stderr)
         return 1

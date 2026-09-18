@@ -36,6 +36,25 @@ Wed Jun  5 02:46:48 2024
 +-----------------------------------------------------------------------------+
 '''
 
+CURRENT_SAMPLE = '''
+Fri Sep 18 08:50:22 2026
++-----------------------------------------------------------------------------+
+|  TECO-SMI: 1.15.0        SDAADriver: 3.1.0        SDAARuntime: 3.2.0        |
+|-------------------------------+----------------------+----------------------|
+| Index  Name                   | Bus-Id               | Health      SPE-Util |
+|        Temp          Pwr Usage|          Memory-Usage|                      |
+|=============================================================================|
+|   0    TECO_AICARD_01         | 00000000:22:00.0     | OK                0% |
+|        33C                94W |        0MB / 65536MB |                      |
++-------------------------------+----------------------+----------------------+
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  Device       PID      Process name                            Memory Usage |
+|=============================================================================|
+| No Process Running                                                          |
++-----------------------------------------------------------------------------+
+'''
+
 
 class TestSdaa(unittest.TestCase):
     def test_parse_and_filter_snapshot(self):
@@ -58,10 +77,56 @@ class TestSdaa(unittest.TestCase):
         with self.assertRaises(sdaa.SdaaError):
             sdaa.parse_teco_smi('driver failed')
 
+    def test_current_teco_smi_layout(self):
+        snapshot = sdaa.parse_teco_smi(CURRENT_SAMPLE)
+        self.assertEqual(snapshot.devices[0].utilization, 0)
+        self.assertEqual(snapshot.devices[0].memory_total, 65536 * 1024 ** 2)
+        self.assertEqual(snapshot.devices[0].temperature, 33)
+        self.assertEqual(snapshot.devices[0].power_watts, 94)
+        self.assertEqual(snapshot.processes, [])
+        loaded = sdaa.parse_teco_smi(CURRENT_SAMPLE.replace('OK                0%',
+                                                            'OK               72%'))
+        self.assertEqual(loaded.devices[0].utilization, 72)
+
     def test_query_failure_is_error(self):
         with mock.patch.object(sdaa.subprocess, 'run', side_effect=OSError('missing')):
             with self.assertRaisesRegex(sdaa.SdaaError, 'Cannot run'):
                 sdaa.query_teco_smi()
+
+    def test_monitor_redraws_in_place_and_quits(self):
+        class Window:
+            def __init__(self):
+                self.lines = []
+                self.erases = 0
+
+            def keypad(self, value):
+                pass
+
+            def timeout(self, value):
+                pass
+
+            def getmaxyx(self):
+                return 24, 80
+
+            def erase(self):
+                self.erases += 1
+
+            def addnstr(self, row, column, value, length):
+                self.lines.append(value[:length])
+
+            def refresh(self):
+                pass
+
+            def getch(self):
+                return ord('q')
+
+        window = Window()
+        with mock.patch.object(sdaa, 'query_teco_smi', return_value=sdaa.parse_teco_smi(SAMPLE)):
+            with mock.patch('curses.wrapper', side_effect=lambda callback: callback(window)):
+                sdaa.monitor_teco_smi('teco-smi', 2.0)
+        self.assertEqual(window.erases, 1)
+        self.assertTrue(any('SPE' in line for line in window.lines))
+        self.assertTrue(any('q: quit' in line for line in window.lines))
 
 
 if __name__ == '__main__':

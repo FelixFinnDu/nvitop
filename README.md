@@ -258,7 +258,7 @@ nvitop --backend sdaa              # refresh every two seconds in a terminal
 nvitop --backend sdaa -o 0 1       # select cards
 ```
 
-`--backend auto` (the default) selects SDAA when NVIDIA NVML is unavailable or reports zero devices and `teco-smi` is installed. Set `NVITOP_TECO_SMI` to the executable path if it is outside `PATH`. SDAA monitor mode is a text overview; press Ctrl-C to leave it. The NVIDIA-specific process filters and CUDA visibility option are unavailable for SDAA.
+`--backend auto` (the default) selects SDAA when NVIDIA NVML is unavailable or reports zero devices and `teco-smi` is installed. Set `NVITOP_TECO_SMI` to the executable path if it is outside `PATH`. SDAA monitor mode redraws in place; press `q` or Ctrl-C to leave it, and use Up/Down to scroll. The NVIDIA-specific process filters and CUDA visibility option are unavailable for SDAA.
 
 ### Resource Monitor
 
