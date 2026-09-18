@@ -88,6 +88,17 @@ class TestSdaa(unittest.TestCase):
                                                             'OK               72%'))
         self.assertEqual(loaded.devices[0].utilization, 72)
 
+    def test_monitor_layout_matches_panel_width(self):
+        snapshot = sdaa.parse_teco_smi(CURRENT_SAMPLE)
+        for width, expected in ((80, 79), (120, 119)):
+            lines = sdaa.monitor_lines(snapshot, width)
+            self.assertEqual(len(lines[1]), expected)
+            self.assertEqual(len(lines[3]), expected)
+            self.assertEqual(len(lines[7]), expected)
+            self.assertEqual(len(lines[8]), expected)
+            self.assertIn('╒', lines[1])
+            self.assertIn('Processes:', '\n'.join(lines))
+
     def test_query_failure_is_error(self):
         with mock.patch.object(sdaa.subprocess, 'run', side_effect=OSError('missing')):
             with self.assertRaisesRegex(sdaa.SdaaError, 'Cannot run'):
@@ -98,6 +109,7 @@ class TestSdaa(unittest.TestCase):
             def __init__(self):
                 self.lines = []
                 self.erases = 0
+                self.attributes = []
 
             def keypad(self, value):
                 pass
@@ -111,8 +123,9 @@ class TestSdaa(unittest.TestCase):
             def erase(self):
                 self.erases += 1
 
-            def addnstr(self, row, column, value, length):
+            def addnstr(self, row, column, value, length, *attributes):
                 self.lines.append(value[:length])
+                self.attributes.extend(attributes)
 
             def refresh(self):
                 pass
@@ -123,10 +136,15 @@ class TestSdaa(unittest.TestCase):
         window = Window()
         with mock.patch.object(sdaa, 'query_teco_smi', return_value=sdaa.parse_teco_smi(SAMPLE)):
             with mock.patch('curses.wrapper', side_effect=lambda callback: callback(window)):
-                sdaa.monitor_teco_smi('teco-smi', 2.0)
+                with mock.patch('curses.has_colors', return_value=True):
+                    with mock.patch('curses.start_color'), mock.patch('curses.use_default_colors'):
+                        with mock.patch('curses.init_pair'), mock.patch('curses.color_pair',
+                                                                       side_effect=lambda pair: pair):
+                            sdaa.monitor_teco_smi('teco-smi', 2.0)
         self.assertEqual(window.erases, 1)
         self.assertTrue(any('SPE' in line for line in window.lines))
         self.assertTrue(any('q: quit' in line for line in window.lines))
+        self.assertTrue(window.attributes)
 
 
 if __name__ == '__main__':

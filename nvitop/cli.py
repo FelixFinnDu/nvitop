@@ -315,7 +315,14 @@ def _run_sdaa(args: argparse.Namespace) -> int:
     monitor = hasattr(args, 'monitor') and TTY
     try:
         if monitor:
-            monitor_teco_smi(command, args.interval or 2.0, indices, pids)
+            monitor_teco_smi(
+                command,
+                args.interval or 2.0,
+                indices,
+                pids,
+                tuple(sorted(args.gpu_util_thresh)) if args.gpu_util_thresh else (10, 75),
+                tuple(sorted(args.mem_util_thresh)) if args.mem_util_thresh else (10, 80),
+            )
         else:
             snapshot = query_teco_smi(command)
             if indices is not None:
